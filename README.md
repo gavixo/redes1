@@ -1,7 +1,5 @@
-//Protocolo 6 Del Libro de Tanenbaum
-//Jorge Peralta
-
-
+# redes1
+Para compartir código de simuladores en Telecomunicaciones 1.
 #define MAX_SEQ 7 /* debe ser 2^n – 1 */
 #define NR_BUFS ((MAX_SEQ 1 1)/2)
 typedef enum {frame_arrival, cksum_err, timeout, network_layer_ready, ack_timeout} event_type;
@@ -97,3 +95,6 @@ switch(event) {
 if (nbuffered < NR_BUFS) enable_network_layer(); else disable_network_layer();
 }
 }
+
+
+
