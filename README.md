@@ -98,3 +98,46 @@ if (nbuffered < NR_BUFS) enable_network_layer(); else disable_network_layer();
 
 
 
+
+
+
+El protocolo 4 (ventana deslizante) es bidireccional. */
+#define MAX_SEQ 1 /* debe ser 1 para el protocolo 4 */
+typedef enum {frame_arrival, cksum_err, timeout} event_type;
+#include “protocol.h”
+void protocol4 (void)
+{
+seq_nr next_frame_to_send; /* sólo 0 o 1 */
+seq_nr frame_expected; /* sólo 0 o 1 */
+frame r, s; /* variables de trabajo */
+packet buffer; /* paquete actual que se envía */
+event_type event;
+next_frame_to_send 5 0; /* siguiente trama del flujo de salida */
+frame_expected 5 0; /* próxima trama esperada */
+from_network_layer(&buffer); /* obtiene un paquete de la capa de red */
+s.info 5 buffer; /* se prepara para enviar la trama inicial */
+s.seq 5 next_frame_to_send; /* inserta el número de secuencia en la trama */
+s.ack 5 1 – frame_expected; /* confirmación de recepción superpuesta */
+to_physical_layer(&s); /* transmite la trama */
+start_timer(s.seq); /* inicia el temporizador */
+while (true){
+ wait_for_event(&event); /* frame_arrival, cksum_err o timeout */
+ if (event 55 frame_arrival){ /* ha llegado una trama sin daño. */
+ from_physical_layer(&r); /* la obtiene */
+ if(r.seq 55 frame_expected) { /* maneja flujo de tramas de entrada. */
+ to_network_layer(&r.info); /* pasa el paquete a la capa de red */
+ inc(frame_expected); /* invierte el siguiente número de secuencia esperado */
+ }
+ if(r.ack 55 next_frame_to_send){ /* maneja flujo de tramas de salida. */
+ stop_timer(r.ack); /* desactiva el temporizador */
+ from_network_layer(&buffer); /* obtiene un nuevo paquete de la capa de red */
+ inc(next_frame_to_send); /* invierte el número de secuencia del emisor */
+ }
+ }
+ s.info 5 buffer; /* construye trama de salida */
+ s.seq 5 next_frame_to_send; /* le inserta el número de secuencia */
+ s.ack 5 1 – frame_expected; /* número de secuencia de la última trama recibida */
+ to_physical_layer(&s); /* transmite una trama */
+ start_timer(s.seq); /* inicia el temporizador */
+}
+}
