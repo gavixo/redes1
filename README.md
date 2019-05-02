@@ -280,6 +280,139 @@ while (true){
  start_timer(s.seq); /* inicia el temporizador */
 }
 }
+Nombre: Kevin Matute
+Fecha: 02/05/2019
+Codigo en c
+Tannenbaum
+
+
+#define linecount 100 
+#define linesize 80 
+#define min(a,b) (((a)<(b))?(a) b))
+#define max(a,b) (((a)>(b))?(a) b)) 
+
+#include "stdafx.h"
+#include "conio.h"
+#include "stdio.h"
+
+void draw_triangle(char **memory,char character,int x1,int y1,int x2,int y2,int x3,int y3);
+void display(char **memory);
+
+int main(int argc, char* argv[])
+{
+//memory initialisieren mit Leerzeichen
+char **memory = new char *[linecount];
+
+for(int i=0;i<linecount;i++)
+memory[i]=new char[linesize];
+
+for(int i=0;i<linecount;i++)
+for(int j=0;j<linesize;j++)
+memory[i][j]=' ';
+
+//Baum zeichnen
+draw_triangle(memory,'X',25,0,35,0,25,45); //Stamm erster Teil
+draw_triangle(memory,'X',35,0,25,45,35,45); //Stamm zweiter Teil (zwei Aufrufe, weil kein Rechteck möglich)
+draw_triangle(memory,'X',0,15,25,15,25,30); //Unterer Ast linker Teil
+draw_triangle(memory,'X',35,15,60,15,35,30); //Unterer Ast rechter Teil
+draw_triangle(memory,'X',5,30,25,30,25,45); //Mittlerer Ast links
+draw_triangle(memory,'X',35,30,55,30,35,45); //Mittlerer Ast rechts
+draw_triangle(memory,'X',10,45,50,45,30,60); //Oberer Ast (links und rechts)
+
+//Baum anzeigen
+display(memory);
+}
+
+//Zeichnet ein Dreick (muss nicht rechtwinkelig sein)
+void draw_triangle(char **memory,char character,int x1,int y1,int x2,int y2,int x3,int y3)
+{
+int x[3]={x1,x2,x3}; //Speichert die Koordinaten in ein Feld
+int y[3]={y1,y2,y3};
+
+int i_t; //Index für oben, mitte, unten (top,middle,bottom)
+int i_m;
+int i_b;
+
+//Top suchen
+if(y1>=y2&&y1>=y3)
+i_t=0;
+else if(y2>=y3)
+i_t=1;
+else
+i_t=2;
+
+//Bottom suchen
+if(y1<y2&&y1<y3)
+i_b=0;
+else if(y2<y3)
+i_b=1;
+else
+i_b=2;
+
+//Middle ist das andere
+i_m=0+1+2-i_t-i_b;
+
+int y_t=y[i_t]; //Einlesen der y-Werte für oben,unten,mitte
+int y_m=y[i_m];
+int y_b=y[i_b];
+
+int x_b=x[i_b]; //Einlesen der x-Werte für oben,unten,mitte
+int x_m=x[i_m];
+int x_t=x[i_t];
+
+int dy_tb=y_t-y_b; //Differenzen in der y-Koordinaten zwischen oben,mitte,unten
+int dy_mb=y_m-y_b;
+int dy_tm=y_t-y_m;
+
+int dx_tb=x_t-x_b; //Dasselbe für die x-Koordinaten
+int dx_mb=x_m-x_b;
+int dx_tm=x_t-x_m;
+
+//Untere Hälfte (Unterteilung in zwei Dreiecke, wobei jeweils eine Seite parallel zur y-Achse liegt
+int x_cutpoint=x_b+dy_mb*(dx_tb/(double)dy_tb); //Berechnet den x-Wert des Punktes, der auf der selben Höhe wie die Mitte auf der Seite von unten nach oben
+
+double d_min=(double)(min(x_m,x_cutpoint)-x_b)/dy_mb; //Berechnet die Veränderung von x bei einer Änderung von y um 1 (min ist links, max ist rechts)
+double d_max=(double)(max(x_m,x_cutpoint)-x_b)/dy_mb;
+
+double x_min=x_b; //Beginnen beim unternen Punkt
+double x_max=x_b;
+
+for(int y_current=y_b;y_current<=y_m;y_current++) //Alle Zeile von unten nach oben durchwandern
+{
+for(int i=x_min;i<x_max;i++) //Den jeweiligen Bereich auffüllen
+memory[y_current][i]=character;
+
+x_min+=d_min;
+x_max+=d_max;
+}
+
+//Obere Hälfte (funktioniert so wie vorher, nur von oben nach unten
+
+x_min=x_t;
+x_max=x_t;
+
+d_min=(double)(min(x_m,x_cutpoint)-x_t)/dy_tm;
+d_max=(double)(max(x_m,x_cutpoint)-x_t)/dy_tm;
+
+for(int y_current=y_t;y_current>=y_m;y_current--)
+{
+for(int i=x_min;i<x_max;i++)
+memory[y_current][i]=character;
+
+x_min+=d_min;
+x_max+=d_max;
+}
+}
+
+//Gibt alles auf dem Bildschirm aus
+void display(char **memory)
+{
+for(int i=linecount-1;i>=0;i--)//Dreht die Ausgabe um damit das normale Koordinatensystem erhalten bleibt (Zeile2 2 ist über Zeile1)
+{
+for(int j=0;j<linesize;j++)
+printf("%c",memory[i][j]);
+}
+}
 
 
 
