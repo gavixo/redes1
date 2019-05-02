@@ -24,6 +24,9 @@ to_physical_layer(&s); /* transmite la trama */
 if (fk 55 data) start_timer(frame_nr % NR_BUFS);
 stop_ack_timer(); /* no se necesita para tramas ack independientes */
 }
+
+
+
 void protocol6(void)
 {
 seq_nr ack_expected; /* límite inferior de la ventana del emisor */
@@ -277,3 +280,7 @@ while (true){
  start_timer(s.seq); /* inicia el temporizador */
 }
 }
+
+
+
+
