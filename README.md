@@ -237,83 +237,43 @@ switch(event) {
 if (nbuffered < NR_BUFS) enable_network_layer(); else disable_network_layer();
 }
 }
-
-/* El protocolo 5 (retroceso n) permite múltiples tramas pendientes. El emisor podría enviar hasta MAX_SEQ
-tramas sin esperar una confirmación de recepción. Además, a diferencia de los protocolos anteriores, no
-existe el supuesto de que la capa de red debe tener siempre un paquete nuevo. En vez de ello, la capa de red
-activa un evento network_layer_ready cuando hay un paquete por enviar. */
-#define MAX_SEQ 7
-typedef enum {frame_arrival, cksum_err, timeout, network_layer_ready} event_type;
+/* El protocolo 4 (ventana deslizante) es bidireccional. */
+#define MAX_SEQ 1 /* debe ser 1 para el protocolo 4 */
+typedef enum {frame_arrival, cksum_err, timeout} event_type;
 #include “protocol.h”
-static boolean between(seq_nr a, seq_nr b, seq_nr c)
+void protocol4 (void)
 {
-/* Devuelve true si a <5b < c de manera circular, y false en caso contrario. */
-if (((a <5 b) && (b < c)) || ((c < a) && (a <5 b)) || ((b < c) && (c < a)))
- return(true);
-else
- return(false);
-}
-static void send_data(seq_nr frame_nr, seq_nr frame_expected, packet buffer[])
-{
-/* Elabora y envía una trama de datos. */
-frame s; /* variable de trabajo */
-s.info 5 buffer[frame_nr]; /* inserta el paquete en la trama */
-s.seq 5 frame_nr; /* inserta un número de secuencia en la trama */
-s.ack 5 (frame_expected 1 MAX_SEQ) % (MAX_SEQ 1 1); /* ack superpuesta*/
-to_physical_layer(&s); /* transmite la trama */
-start_timer(frame_nr); /* inicia la ejecución del temporizador */
-}
-void protocol5(void)
-{
-seq_nr next_frame_to_send; /* MAX_SEQ > 1; se usa para flujo de salida */
-seq_nr ack_expected; /* la trama más antigua no confirmada hasta el momento*/
-seq_nr frame_expected; /* siguiente trama esperada en el flujo de entrada */
-frame r; /* variable de trabajo */
-packet buffer[MAX_SEQ 1 1]; /* búferes para el flujo de salida */
-seq_nr nbuffered; /* número de búferes de salida actualmente en uso */
-seq_nr i; /* se usa para indexar en el arreglo de búferes */
+seq_nr next_frame_to_send; /* sólo 0 o 1 */
+seq_nr frame_expected; /* sólo 0 o 1 */
+frame r, s; /* variables de trabajo */
+packet buffer; /* paquete actual que se envía */
 event_type event;
-enable_network_layer(); /* permite eventos network_layer_ready */
-ack_expected 5 0; /* siguiente ack esperada en el flujo de entrada */
-next_frame_to_send 5 0; /* siguiente trama de salida */
-frame_expected 5 0; /* número de trama de entrada esperada */
-nbuffered 5 0; /* al inicio no hay paquetes en el búfer */
-while (true) {
-wait_for_event(&event); /* cuatro posibilidades: vea event_type al principio */
-switch(event) {
-case network_layer_ready: /* la capa de red tiene un paquete para enviar */
- /* Acepta, guarda y transmite una trama nueva. */
- from_network_layer(&buffer[next_frame_to_send]); /* obtiene un paquete nuevo */
- nbuffered 5 nbuffered 1 1; /* expande la ventana del emisor */
- send_data(next_frame_to_send, frame_expected, buffer); /* transmite la trama */
- inc(next_frame_to_send); /* avanza el límite superior de la ventana del emisor */
- break;
-case frame_arrival: /* ha llegado una trama de datos o de control */
- from_physical_layer(&r); /* obtiene una trama entrante de la capa física */
- if (r.seq 55 frame_expected) {
- /* Las tramas se aceptan sólo en orden. */
+next_frame_to_send 5 0; /* siguiente trama del flujo de salida */
+frame_expected 5 0; /* próxima trama esperada */
+from_network_layer(&buffer); /* obtiene un paquete de la capa de red */
+s.info 5 buffer; /* se prepara para enviar la trama inicial */
+s.seq 5 next_frame_to_send; /* inserta el número de secuencia en la trama */
+s.ack 5 1 – frame_expected; /* confirmación de recepción superpuesta */
+to_physical_layer(&s); /* transmite la trama */
+start_timer(s.seq); /* inicia el temporizador */
+while (true){
+ wait_for_event(&event); /* frame_arrival, cksum_err o timeout */
+ if (event 55 frame_arrival){ /* ha llegado una trama sin daño. */
+ from_physical_layer(&r); /* la obtiene */
+ if(r.seq 55 frame_expected) { /* maneja flujo de tramas de entrada. */
  to_network_layer(&r.info); /* pasa el paquete a la capa de red */
- inc(frame_expected); /* avanza el límite inferior de la ventana del receptor */
+ inc(frame_expected); /* invierte el siguiente número de secuencia esperado */
  }
- /* Ack n implica n - 1, n - 2, etc. Verificar esto. */
- while (between(ack_expected, r.ack, next_frame_to_send)) {
- /* Maneja la ack superpuesta. */
- nbuffered 5 nbuffered - 1; /* una trama menos en el búfer */
- stop_timer(ack_expected); /* la trama llegó intacta; detener el temporizador */
- inc(ack_expected); /* contrae la ventana del emisor */
+ if(r.ack 55 next_frame_to_send){ /* maneja flujo de tramas de salida. */
+ stop_timer(r.ack); /* desactiva el temporizador */
+ from_network_layer(&buffer); /* obtiene un nuevo paquete de la capa de red */
+ inc(next_frame_to_send); /* invierte el número de secuencia del emisor */
  }
- break;
-case cksum_err: break; /* ignora las tramas erróneas */
-case timeout: /* problemas; retransmite todas las tramas pendientes */
- next_frame_to_send 5 ack_expected; /* aquí inicia la retransmisión */
- for (i 5 1; i <5 nbuffered; i11) {
- send_data(next_frame_to_send, frame_expected, buffer); /* reenvía trama */
- inc(next_frame_to_send); /* se prepara para enviar la siguiente */
  }
-}
-if (nbuffered < MAX_SEQ)
- enable_network_layer();
-else
- disable_network_layer();
+ s.info 5 buffer; /* construye trama de salida */
+ s.seq 5 next_frame_to_send; /* le inserta el número de secuencia */
+ s.ack 5 1 – frame_expected; /* número de secuencia de la última trama recibida */
+ to_physical_layer(&s); /* transmite una trama */
+ start_timer(s.seq); /* inicia el temporizador */
 }
 }
